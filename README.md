@@ -7,3 +7,5 @@ AI-powered email rewriting assistant for medical/pharma use cases.
 - Compliance checker agent
 - Add hallucination evaluation
 - Add Docker deployment to Azure
+## System Architecture
+![architecture](docs/architecture.png)
