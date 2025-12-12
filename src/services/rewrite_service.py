@@ -1,12 +1,8 @@
-import os
 import json
 from openai import OpenAI
-from dotenv import load_dotenv
+from src.settings import settings
 
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-print(os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=settings.openai_api_key)
 
 def load_template(audience: str) -> str:
     mapping = {
@@ -23,7 +19,7 @@ def rewrite_email_llm(text: str, audience: str) -> str:
     prompt = template.replace("{{text}}", text).replace("{{audience}}", audience)
 
     completion = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=settings.openai_model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3
     )
