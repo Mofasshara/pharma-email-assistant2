@@ -1,2 +1,5 @@
 .env
-.env
+venv/
+__pycache__/
+logs/
+evaluation/dataset_from_logs.csv
