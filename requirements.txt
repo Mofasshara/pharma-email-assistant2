@@ -7,4 +7,7 @@ loguru
 chromadb
 langchain
 pypdf
+pandas
+pyyaml
+rich
 pydantic-settings
