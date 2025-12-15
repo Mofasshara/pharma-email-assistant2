@@ -1,0 +1,24 @@
+name: Prompt Evaluation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - run: pip install -r requirements.txt
+    - run: pip install pandas pyyaml rich
+
+    - name: Run experiment
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        OPENAI_MODEL: gpt-4o-mini
+      run: |
+        python prompt_playground/run_experiment.py --prompt rewrite_medical_v2 --dataset rewrite_eval_set.csv
