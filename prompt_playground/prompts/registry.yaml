@@ -1,0 +1,9 @@
+prompts:
+  rewrite_medical_v1:
+    file: rewrite_medical_v1.txt
+    task: rewrite
+    audience: medical_affairs
+  rewrite_regulatory_v1:
+    file: rewrite_regulatory_v1.txt
+    task: rewrite
+    audience: regulatory
