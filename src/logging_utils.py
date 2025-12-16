@@ -13,6 +13,9 @@ def log_request(input_text: str, audience: str, output: dict, feedback: dict | N
         "audience": audience,
         "output": output,
         "feedback": feedback,
+        "latency_ms": output.get("metadata", {}).get("latency_ms"),
+        "tokens": output.get("metadata", {}).get("tokens"),
+        "model": output.get("metadata", {}).get("model"),
     }
     with LOG_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")

@@ -5,6 +5,7 @@ from loguru import logger
 import traceback
 
 from src.logging_utils import log_request
+from src.safety_checks import basic_safety_check
 from src.services.rewrite_service import rewrite_email_llm
 
 
@@ -33,7 +34,20 @@ def health():
 def rewrite_email(payload: EmailRequest):
     logger.info(f"Incoming request: {payload.dict()}")
     try:
+        if not basic_safety_check(payload.text):
+            logger.warning("Safety check failed for input text")
+            return {
+                "error": "Safety check failed",
+                "reason": "Potential hallucination or unsafe claim"
+            }
+
         output = rewrite_email_llm(payload.text, payload.audience)
+        if not basic_safety_check(output["rewritten_email"]):
+            logger.warning("Safety check failed for rewritten email")
+            return {
+                "error": "Safety check failed",
+                "reason": "Potential hallucination or unsafe claim"
+            }
         logger.info("Rewrite successful")
         log_request(payload.text, payload.audience, output, feedback=None)
         return output
