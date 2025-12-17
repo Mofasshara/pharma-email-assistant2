@@ -14,11 +14,36 @@ RAG (Retrieval-Augmented Generation) combines a vector-based document search wit
 
 ## 🧪 Example API Calls
 
+
 ### POST /rag/ask
 ```json
 {
   "query": "What are EMA requirements for stability testing?"
 }
+{
+  "answer": "...",
+  "sources": ["stability_guideline.pdf"]
+}
+
+---
+
+### ✅ 3. Save the file
+- Press **Ctrl+S** (Windows) or **Cmd+S** (Mac)
+
+---
+
+## 🧭 Step 2 — Commit Week 7
+
+### ✅ 1. Open Source Control tab
+- Click the **branch icon** in the left sidebar (Source Control)
+
+### ✅ 2. Stage your changes
+- You’ll see `rag/README.md` under **Changes**
+- Click the **+** icon next to it (or click `...` → Stage All Changes)
+
+### ✅ 3. Write your commit message
+- In the message box, type:
+
 
 This directory holds the Retrieval-Augmented Generation (RAG) pieces used by the app.
 
