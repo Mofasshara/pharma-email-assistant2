@@ -23,3 +23,6 @@ def agent_handle(payload: AgentRequest):
         # Log the root cause so we can see the failure in the server console.
         logger.exception("Agent handle failed")
         raise HTTPException(status_code=500, detail="Internal server error")
+@app.get("/agent/health")
+def agent_health():
+    return {"status": "ok", "service": "agent-orchestrator"}
