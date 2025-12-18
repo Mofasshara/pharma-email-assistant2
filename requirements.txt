@@ -11,3 +11,5 @@ pandas
 pyyaml
 rich
 pydantic-settings
+langchain==0.2.16
+langchain-openai==0.1.23
