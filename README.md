@@ -97,3 +97,27 @@ Secrets are **never hardcoded** in code — they are injected at runtime by Azur
 
 ### Architecture
 Agent Orchestrator routes requests and calls downstream tool services via environment-configured URLs.
+
+## Production Architecture
+
+- Agent API (FastAPI) deployed on Azure App Service
+- Rewrite LLM service deployed as separate App Service
+- Agent orchestrates calls to rewrite service via HTTP
+- Hardened with:
+  - HTTPS normalization
+  - Request timeouts
+  - Clear error propagation
+- Observability:
+  - Azure Log Stream
+  - Application Insights (Search, Failures)
+  - Availability monitoring
+    
+## Reliability & Monitoring
+
+- Health endpoints for all services
+- Azure Application Insights for:
+  - Request tracing
+  - Failure analysis
+- Availability tests with alerting enabled
+- Defensive networking (timeouts, retries, URL validation)
+
