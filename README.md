@@ -87,3 +87,13 @@ Secrets are **never hardcoded** in code — they are injected at runtime by Azur
 ### Swagger UI (live)
 "C:\Users\mofas\OneDrive\Desktop\AI engineer\fastapi.UI.png"
 
+## Live Deployments (Azure)
+
+- Agent Orchestrator API (FastAPI + LangChain):  
+  https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/docs
+
+- Rewrite Service API (FastAPI):  
+  https://pharma-email-rewrite-mofr-gph0dueeegetf9gr.westeurope-01.azurewebsites.net/docs
+
+### Architecture
+Agent Orchestrator routes requests and calls downstream tool services via environment-configured URLs.
