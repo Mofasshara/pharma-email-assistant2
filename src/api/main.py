@@ -1,3 +1,4 @@
+import uuid
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
@@ -15,6 +16,21 @@ class EmailRequest(BaseModel):
 
 
 app = FastAPI(port=8000)
+
+
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+    logger.info(f"[{request_id}] Incoming {request.method} {request.url.path}")
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(f"[{request_id}] Unhandled error")
+        raise
+    response.headers["X-Request-ID"] = request_id
+    logger.info(f"[{request_id}] Completed {response.status_code}")
+    return response
 
 
 class FeedbackRequest(BaseModel):

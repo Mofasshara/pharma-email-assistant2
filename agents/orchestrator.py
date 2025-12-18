@@ -17,13 +17,13 @@ def route_request(user_input: str) -> str:
     return str(decision).strip()
 
 
-def handle_request(text: str, audience: str):
+def handle_request(text: str, audience: str, request_id: str | None = None):
     route = route_request(text)
 
     if "RAG" in route:
-        result = rag_search(text)
+        result = rag_search(text, request_id=request_id)
     else:
-        result = rewrite_email(text, audience)
+        result = rewrite_email(text, audience, request_id=request_id)
 
     if not evaluate_output(result):
         return "Response blocked due to policy."
