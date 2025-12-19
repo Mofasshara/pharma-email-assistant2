@@ -1,58 +1,50 @@
 import os
 import requests
-from requests.exceptions import RequestException, Timeout
-from agents.tools.exceptions import ToolServiceError
 
 
-def _normalize_base_url(raw: str) -> str:
-    """
-    Accepts:
-      - https://example.com
-      - http://example.com
-      - example.com
-    Returns:
-      - https://example.com   (default scheme added)
-    """
-    raw = (raw or "").strip().rstrip("/")
-    if not raw:
+def normalize_base_url(url: str) -> str:
+    if not url:
         return ""
-    if not raw.startswith(("http://", "https://")):
-        raw = "https://" + raw
-    return raw
+    url = url.strip()
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    return url.rstrip("/")
 
 
-REWRITE_API_URL = _normalize_base_url(os.getenv("REWRITE_API_URL"))
+REWRITE_BASE_URL = normalize_base_url(
+    os.getenv("REWRITE_API_BASE")
+)
 
 
-def rewrite_email(text: str, audience: str, request_id: str | None = None) -> str:
-    if not REWRITE_API_URL:
-        raise ToolServiceError(
-            "Rewrite tool: REWRITE_API_URL is not set. "
-            "Set it in Azure App Service → Environment variables."
-        )
+def rewrite_email(text: str, audience: str):
+    if not REWRITE_BASE_URL:
+        raise RuntimeError("REWRITE_API_BASE environment variable is not set")
 
-    url = f"{REWRITE_API_URL}/rewrite"
-    payload = {"text": text, "audience": audience}
+    url = f"{REWRITE_BASE_URL}/rewrite"
 
     try:
-        resp = requests.post(url, json=payload, timeout=(5, 30))  # connect, read
+        resp = requests.post(
+            url,
+            json={
+                "text": text,
+                "audience": audience
+            },
+            timeout=(5, 30)  # 5s connect, 30s read
+        )
         resp.raise_for_status()
-    except Timeout as e:
-        raise ToolServiceError(
-            f"Rewrite tool timeout. url={url} request_id={request_id or 'n/a'}"
-        ) from e
-    except RequestException as e:
-        status = getattr(getattr(e, "response", None), "status_code", None)
-        body = ""
-        if getattr(e, "response", None) is not None:
-            try:
-                body = e.response.text[:500]  # avoid huge logs
-            except Exception:
-                body = "<unable to read response body>"
+        return resp.json()
 
-        raise ToolServiceError(
-            f"Rewrite tool failure. url={url} status={status} request_id={request_id or 'n/a'} body={body}"
-        ) from e
+    except requests.exceptions.Timeout:
+        raise RuntimeError(
+            f"Rewrite service timed out calling {url}"
+        )
 
-    data = resp.json()
-    return data.get("rewritten_email") or data.get("response") or str(data)
+    except requests.exceptions.ConnectionError as e:
+        raise RuntimeError(
+            f"Rewrite service connection error calling {url}: {str(e)}"
+        )
+
+    except requests.exceptions.HTTPError as e:
+        raise RuntimeError(
+            f"Rewrite service returned {resp.status_code}: {resp.text}"
+        ) from e
