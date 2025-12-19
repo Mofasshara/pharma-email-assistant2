@@ -1,0 +1,15 @@
+input_text,audience,rewritten_email,rating,comments
+pls send AE info,Regulatory,"Dear [Recipient's Name],
+
+Please provide the required information regarding the adverse events (AEs) as per the regulatory reporting obligations. Ensure that all relevant details are included to maintain compliance with applicable regulations.
+
+Thank you for your prompt attention to this matter.
+
+Best regards,
+
+[Your Name]
+[Your Position]
+[Your Contact Information]",,
+pls send AE info,Regulatory,example,5,Looks good
+pls send AE info,Regulatory,Please provide the required information regarding Adverse Events (AEs) as per regulatory guidelines. Ensure that all data submitted is complete and complies with applicable reporting standards.,,
+pls send AE info,Regulatory,example,5,Looks good
