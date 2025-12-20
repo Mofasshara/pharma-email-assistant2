@@ -32,7 +32,10 @@ def rag_search(query: str, request_id: str | None = None) -> str:
             except Exception:
                 body = "<unable to read response body>"
         req_id = request_id or "n/a"
-        msg = f"RAG tool failure. url={url} status={status} request_id={req_id} body={body}"
+        msg = (
+            "RAG tool failure. "
+            f"url={url} status={status} request_id={req_id} body={body}"
+        )
         raise ToolServiceError(msg) from e
 
     data = resp.json()
