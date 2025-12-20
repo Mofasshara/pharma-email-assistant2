@@ -1,4 +1,5 @@
-# ruff: noqa: E402import sys
+# ruff: noqa: E402
+import sys
 import json
 from pathlib import Path
 
