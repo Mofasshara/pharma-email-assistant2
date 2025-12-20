@@ -15,7 +15,10 @@ def main(results_file: str, min_ok_rate: float) -> None:
             total += 1
             rec = json.loads(line)
             out = rec.get("output") or {}
-            rewritten = out.get("rewritten_email") if isinstance(out, dict) else str(out)
+            if isinstance(out, dict):
+                rewritten = out.get("rewritten_email")
+            else:
+                rewritten = str(out)
 
             if rewritten and len(rewritten.strip()) >= 30:
                 ok += 1

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.services.rewrite_service import rewrite_email_llm
+from src.services.rewrite_service import rewrite_email_llm  # noqa: E402
 
 BASE = Path("prompt_playground")
 PROMPTS_DIR = BASE / "prompts"
