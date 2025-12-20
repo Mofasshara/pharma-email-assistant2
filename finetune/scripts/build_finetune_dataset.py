@@ -10,7 +10,9 @@ with IN_FILE.open() as f, OUT_FILE.open("w") as out:
         r = json.loads(line)
         feedback = r.get("feedback") or {}
         if feedback.get("rating", 0) >= 4:
-            prompt = f"Rewrite the following email for {r['audience']}:\n{r['input_text']}"
+            audience = r["audience"]
+            input_text = r["input_text"]
+            prompt = f"Rewrite the following email for {audience}:\n{input_text}"
             completion = (r.get("output") or {}).get("rewritten_email")
             out.write(json.dumps({
                 "prompt": prompt,

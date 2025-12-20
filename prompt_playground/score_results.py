@@ -13,19 +13,23 @@ def main(results_file: str):
     in_path = Path(results_file)
     out_path = in_path.with_name(in_path.stem + "__scored.jsonl")
 
-    with in_path.open(encoding="utf-8") as f, out_path.open("w", encoding="utf-8") as out_f:
-        for line in f:
-            record = json.loads(line)
-            output = record["output"]
-            rewritten = output.get("rewritten_email") if isinstance(output, dict) else str(output)
+    with in_path.open(encoding="utf-8") as f:
+        with out_path.open("w", encoding="utf-8") as out_f:
+            for line in f:
+                record = json.loads(line)
+                output = record["output"]
+                if isinstance(output, dict):
+                    rewritten = output.get("rewritten_email")
+                else:
+                    rewritten = str(output)
 
-            scores = judge(
-                input_email=record["input_email"],
-                output_email=rewritten,
-                audience=record["audience"],
-            )
-            record["scores"] = scores
-            out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                scores = judge(
+                    input_email=record["input_email"],
+                    output_email=rewritten,
+                    audience=record["audience"],
+                )
+                record["scores"] = scores
+                out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     print("Saved scored results:", out_path)
 

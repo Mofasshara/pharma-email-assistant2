@@ -96,7 +96,8 @@ def agent_deps(request: Request):
     except RequestException as exc:
         latency_ms = int((time.perf_counter() - start) * 1000)
         status = getattr(getattr(exc, "response", None), "status_code", None)
-        raise HTTPException(
-            status_code=502,
-            detail=f"Rewrite health check failed. url={url} status={status} latency_ms={latency_ms} request_id={request_id}",
+        detail = (
+            "Rewrite health check failed. "
+            f"url={url} status={status} latency_ms={latency_ms} request_id={request_id}"
         )
+        raise HTTPException(status_code=502, detail=detail)

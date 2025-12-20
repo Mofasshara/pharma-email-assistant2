@@ -5,7 +5,12 @@ from pathlib import Path
 LOG_FILE = Path("logs/requests.jsonl")
 
 
-def log_request(input_text: str, audience: str, output: dict, feedback: dict | None = None):
+def log_request(
+    input_text: str,
+    audience: str,
+    output: dict,
+    feedback: dict | None = None,
+):
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     record = {
         "timestamp": datetime.utcnow().isoformat(),

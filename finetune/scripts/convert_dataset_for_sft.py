@@ -13,7 +13,9 @@ with IN_FILE.open(encoding="utf-8") as f, OUT_FILE.open("w", encoding="utf-8") a
 
         # Replace placeholder completions if needed
         if completion.strip().lower() == "example":
-            completion = "Please provide the adverse event information as soon as possible."
+            completion = (
+                "Please provide the adverse event information as soon as possible."
+            )
 
         text = f"""### Instruction:
 Rewrite the following email for Regulatory.

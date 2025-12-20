@@ -31,9 +31,9 @@ def rag_search(query: str, request_id: str | None = None) -> str:
                 body = e.response.text[:500]
             except Exception:
                 body = "<unable to read response body>"
-        raise ToolServiceError(
-            f"RAG tool failure. url={url} status={status} request_id={request_id or 'n/a'} body={body}"
-        ) from e
+        req_id = request_id or "n/a"
+        msg = f"RAG tool failure. url={url} status={status} request_id={req_id} body={body}"
+        raise ToolServiceError(msg) from e
 
     data = resp.json()
     # Expect "answer" but fall back to entire payload for debugging.
