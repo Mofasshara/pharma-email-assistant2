@@ -1,7 +1,3 @@
-id,audience,input_email
-1,medical_affairs,"Hey team, please share the latest trial results asap. Thanks!"
-2,regulatory,"pls send adverse event summary for last quarter - urgent"
-3,hcp,"Can you confirm the recommended dose for elderly patients?"
-4,patient,"Hi, can I take this medicine with food? I'm worried."
-5,medical_affairs,"Need a clean summary of endpoints for internal review."
-6,regulatory,"Requesting SmPC update timeline and justification."
+id,input_email,audience
+1,"Please rewrite this email about adverse events.","Regulatory"
+2,"Could you send the updated protocol by Friday?","Clinical Ops"

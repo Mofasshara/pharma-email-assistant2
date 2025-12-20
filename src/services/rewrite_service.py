@@ -22,7 +22,11 @@ def load_template(audience: str) -> str:
     filename = mapping.get(audience.lower(), "rewrite_medical.txt")
     return open(f"src/prompts/{filename}").read()
 
-def rewrite_email_llm(text: str, audience: str) -> str:
+def rewrite_email_llm(
+    text: str,
+    audience: str,
+    prompt_override: str | None = None,
+) -> str:
     client = get_client()
     if client is None:
         return {
@@ -38,7 +42,7 @@ def rewrite_email_llm(text: str, audience: str) -> str:
             }
         }
 
-    template = load_template(audience)
+    template = prompt_override or load_template(audience)
     prompt = template.replace("{{text}}", text).replace("{{audience}}", audience)
 
     start_time = time.time()
