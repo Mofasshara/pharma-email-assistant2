@@ -1,6 +1,6 @@
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain.chains import RetrievalQA
 
 
 def build_vectorstore(pdf_path="sample.pdf"):

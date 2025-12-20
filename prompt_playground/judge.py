@@ -1,4 +1,3 @@
-import os
 import json
 from openai import OpenAI
 from src.settings import settings

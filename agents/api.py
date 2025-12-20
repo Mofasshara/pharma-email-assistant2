@@ -64,7 +64,7 @@ def agent_handle(payload: AgentRequest, request: Request):
     except HTTPException:
         # propagate existing HTTP exceptions (e.g., validation)
         raise
-    except Exception as exc:
+    except Exception:
         logger.exception("Agent handle failed")
         raise HTTPException(status_code=500, detail="Internal server error")
 
