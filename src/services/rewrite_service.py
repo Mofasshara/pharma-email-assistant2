@@ -29,7 +29,11 @@ def rewrite_email_llm(text: str, audience: str) -> str:
             "rewritten_email": text,
             "metadata": {
                 "latency_ms": 0,
-                "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                "tokens": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                },
                 "model": "stub"
             }
         }
