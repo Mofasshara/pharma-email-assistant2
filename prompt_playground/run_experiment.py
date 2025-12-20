@@ -1,4 +1,4 @@
-import sys
+# ruff: noqa: E402import sys
 import yaml
 import pandas as pd
 from pathlib import Path
