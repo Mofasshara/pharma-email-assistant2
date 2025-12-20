@@ -19,3 +19,9 @@ jobs:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         python prompt_playground/run_experiment.py --prompt rewrite_medical_v2 --dataset rewrite_eval_set.csv
+
+    - name: Guardrail check
+      run: |
+        python prompt_playground/guardrail.py \
+          --results "$(ls -t prompt_playground/results/*.jsonl | head -n 1)" \
+          --min_ok_rate 0.8
