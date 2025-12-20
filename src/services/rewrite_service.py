@@ -3,7 +3,14 @@ import time
 from openai import OpenAI
 from src.settings import settings
 
-client = OpenAI(api_key=settings.openai_api_key)
+_client = None
+
+
+def get_client() -> OpenAI | None:
+    global _client
+    if _client is None and settings.openai_api_key:
+        _client = OpenAI(api_key=settings.openai_api_key)
+    return _client
 
 def load_template(audience: str) -> str:
     mapping = {
@@ -16,6 +23,17 @@ def load_template(audience: str) -> str:
     return open(f"src/prompts/{filename}").read()
 
 def rewrite_email_llm(text: str, audience: str) -> str:
+    client = get_client()
+    if client is None:
+        return {
+            "rewritten_email": text,
+            "metadata": {
+                "latency_ms": 0,
+                "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                "model": "stub"
+            }
+        }
+
     template = load_template(audience)
     prompt = template.replace("{{text}}", text).replace("{{audience}}", audience)
 
