@@ -26,7 +26,6 @@ def load_prompt_text(filename: str) -> str:
 
 def main(prompt_key: str, dataset_file: str):
     reg = load_registry()["prompts"]
-    prompt_meta = reg[prompt_key]
     dataset_path = DATASETS_DIR / dataset_file
 
     df = pd.read_csv(dataset_path)
