@@ -15,3 +15,7 @@ prompts:
     file: rewrite_regulatory_v2.txt
     task: rewrite
     audience: regulatory
+  banking_risk_rewrite_v1:
+    file: ../../shared/prompts/banking/risk_rewrite_v1.txt
+    domain: banking
+    task: risk_rewrite
