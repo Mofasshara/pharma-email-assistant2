@@ -44,6 +44,59 @@ curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azure
   -d '{"email":"This product will give you excellent returns and is risk-free. You should buy today.","audience":"client","language":"en"}'
 ```
 
+## Quickstart
+Local run:
+```bash
+python -m uvicorn agents.api:app --reload --port 8081
+```
+
+Docker run:
+```bash
+docker run --rm -p 8081:80 mofasshara/pharma-email-assistant:banking-v2
+```
+
+Azure endpoints:
+```text
+https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
+https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite
+```
+
+Example curl flow:
+```bash
+curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
+curl -s -X POST https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite \
+  -H "Content-Type: application/json" \
+  -d '{"email":"This product will give you excellent returns and is risk-free. You should buy.","audience":"client","language":"en"}' | jq .
+```
+
+## Banking End-to-End Flow
+```bash
+# 1) Health check
+curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
+
+# 2) Rewrite (POST)
+curl -s -X POST https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "This product will give you excellent returns and is risk-free. You should buy.",
+    "audience": "client",
+    "language": "en"
+  }' | jq .
+
+# Example response (redacted):
+# {
+#   "rewritten_email": "...",
+#   "risk_level": "high",
+#   "flagged_phrases": ["will give you excellent returns","risk-free","you should buy"],
+#   "disclaimer_added": true,
+#   "rationale": "Detected 3 risky phrase(s)..."
+#   "trace_id": "REPLACE_WITH_REAL_TRACE_ID_IF_YOUR_API_RETURNS_IT"
+# }
+
+# 3) Fetch review by trace_id (if your system stores it)
+curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/reviews/<TRACE_ID> | jq .
+```
+
 ## Banking Risk Rewriter — Review Workflow (Human-in-the-loop)
 Endpoints
 
