@@ -7,6 +7,7 @@ from src.banking.schemas import BankingRewriteRequest, BankingRewriteResponse
 from src.banking.audit_store import append_record
 from platform_layer.policies.loader import load_policy
 from platform_layer.runtime.context import RuntimeContext
+from platform_layer.audit.logger import log_event
 
 MAX_LEN = 5000
 
@@ -116,6 +117,15 @@ def rewrite_banking_email(
         trace_id=trace_id,
         created_at=created_at,
         rationale=rationale,
+    )
+    log_event(
+        trace_id,
+        {
+            "domain": ctx.domain,
+            "risk_level": risk,
+            "flagged_phrases": flagged,
+            "disclaimer_added": disclaimer_added,
+        },
     )
     record = {
         "trace_id": trace_id,
