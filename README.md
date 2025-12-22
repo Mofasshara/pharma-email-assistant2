@@ -1,3 +1,122 @@
+# Banking Client Communication Risk Rewriter (FINMA-style guardrails)
+
+A FastAPI service that rewrites relationship-manager emails to reduce regulatory/compliance risk.
+It classifies risk level, flags risky phrases, and injects a disclaimer when needed.
+
+## What it does
+Given:
+- `email`: client message draft
+- `audience`: e.g. `client`, `internal`, `compliance`
+- `language`: default `en`
+
+Returns:
+- `rewritten_email`
+- `risk_level` (`low` | `medium` | `high`)
+- `flagged_phrases` (list)
+- `disclaimer_added` (bool)
+- `rationale` (short explanation)
+
+## Live endpoints (Azure)
+- Health: `GET /banking/health`
+- Rewrite: `POST /banking/rewrite`
+- OpenAPI: `/docs` and `/openapi.json`
+
+Example:
+- `https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health`
+
+## API schema
+### POST /banking/rewrite
+Request body:
+```json
+{
+  "email": "string",
+  "audience": "string",
+  "language": "en"
+}
+```
+
+Response body:
+```json
+{
+  "rewritten_email": "string",
+  "risk_level": "medium",
+  "flagged_phrases": ["string"],
+  "disclaimer_added": true,
+  "rationale": "string"
+}
+```
+
+Quick test (curl)
+
+Health:
+```bash
+curl -i "https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health"
+```
+
+Rewrite:
+```bash
+curl -i -X POST \
+  "https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"This product will give you excellent returns. You should invest now.","audience":"client","language":"en"}'
+```
+
+Local dev (Docker)
+
+Build:
+```bash
+docker build -t pharma-email-assistant:local .
+```
+
+Run:
+```bash
+docker run --rm -p 8080:8080 \
+  -e PORT=8080 \
+  pharma-email-assistant:local
+```
+
+Test locally:
+```bash
+curl -i http://localhost:8080/banking/health
+```
+
+ARM Mac + Azure (AMD64) build
+
+If you're on an ARM64 Mac, build an AMD64 image for Azure:
+```bash
+docker buildx create --use --name multiarch || docker buildx use multiarch
+docker buildx build --platform linux/amd64 \
+  -t mofasshara/pharma-email-assistant:banking-v2 \
+  --push .
+```
+
+Risk classification rules (current)
+
+Document what you’re flagging (examples):
+- "guaranteed returns" -> high
+- "will give you excellent returns" -> medium
+- "you should invest now" -> medium/high
+
+Notes
+
+This is a demo for internal pilot-style workflows:
+- human-in-the-loop friendly outputs
+- audit-friendly rationale
+- deterministic response schema
+
+## Architecture (high level)
+Client -> FastAPI (`/banking/rewrite`)
+-> risk phrase scan + risk level assignment
+-> disclaimer injection (if needed)
+-> rewrite (rule-based rewrite v1)
+-> structured JSON response + request id
+
+## Azure App Service (container) settings
+- Container type: Single container
+- Registry: docker.io
+- Image: mofasshara/pharma-email-assistant:banking-v2
+- Port: 8080 (via PORT env var, if used)
+
 # pharma-email-assistant2
 AI-powered email rewriting assistant for medical/pharma use cases.
 ![Architecture Diagram](Untitled-2025-12-11-1423.png)
@@ -120,4 +239,3 @@ Agent Orchestrator routes requests and calls downstream tool services via enviro
   - Failure analysis
 - Availability tests with alerting enabled
 - Defensive networking (timeouts, retries, URL validation)
-

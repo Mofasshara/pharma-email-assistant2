@@ -11,9 +11,8 @@ def normalize_base_url(url: str) -> str:
     return url.rstrip("/")
 
 
-REWRITE_BASE_URL = normalize_base_url(
-    os.getenv("REWRITE_API_BASE")
-)
+REWRITE_BASE_URL = normalize_base_url(os.getenv("REWRITE_API_BASE"))
+REWRITE_API_URL = REWRITE_BASE_URL
 
 
 def rewrite_email(text: str, audience: str):

@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from requests import RequestException
+from src.banking.api import router as banking_router
 from agents.orchestrator import handle_request
 from agents.tools.rewrite_tool import REWRITE_API_URL
 from agents.tools.exceptions import ToolServiceError
@@ -14,6 +15,7 @@ from agents.tools.exceptions import ToolServiceError
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Agent Orchestrator API")
+app.include_router(banking_router)
 
 
 @app.middleware("http")
