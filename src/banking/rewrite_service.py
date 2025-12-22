@@ -15,6 +15,8 @@ RISKY_PHRASES = [
     "i recommend you invest",
 ]
 
+MAX_LEN = 5000
+
 DISCLAIMER = (
     "\n\nDisclaimer: This message is for information purposes only and does not "
     "constitute investment advice. Any decision should be based on your risk "
@@ -54,13 +56,23 @@ def _rewrite_minimal(email: str) -> str:
     return out.strip()
 
 
+def _post_process(rewritten: str) -> str:
+    return _rewrite_minimal(rewritten)
+
+
 def rewrite_banking_email(req: BankingRewriteRequest) -> BankingRewriteResponse:
     trace_id = str(uuid.uuid4())
     created_at = datetime.utcnow().isoformat() + "Z"
-    flagged = _find_flagged_phrases(req.email)
+    email = req.email.strip()
+    if not email:
+        raise ValueError("email cannot be empty")
+    if len(email) > MAX_LEN:
+        raise ValueError(f"email too long (max {MAX_LEN})")
+
+    flagged = _find_flagged_phrases(email)
     risk = _risk_level(flagged)
 
-    rewritten = _rewrite_minimal(req.email)
+    rewritten = _rewrite_minimal(email)
     post_check_note = None
     remaining = _find_flagged_phrases(rewritten)
     if remaining:
@@ -69,6 +81,8 @@ def rewrite_banking_email(req: BankingRewriteRequest) -> BankingRewriteResponse:
         remaining = _find_flagged_phrases(rewritten)
         if remaining:
             post_check_note = "Post-check: risky language remained; softened further."
+
+    rewritten = _post_process(rewritten)
 
     # Always append disclaimer for client-facing messages
     disclaimer_added = True
