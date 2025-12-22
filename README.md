@@ -69,33 +69,104 @@ curl -s -X POST https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-
   -d '{"email":"This product will give you excellent returns and is risk-free. You should buy.","audience":"client","language":"en"}' | jq .
 ```
 
-## Banking End-to-End Flow
+## Banking Risk Rewriter (What This Service Does)
+- Rewrites client communication to reduce risky language
+- Flags risky phrases
+- Risk-level classification: low / medium / high
+- Always adds disclaimer for audience=client|external
+
+## Public Endpoints (Production URLs)
+Health
+```bash
+curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
+```
+
+Rewrite
+```json
+{
+  "email": "string",
+  "audience": "string",
+  "language": "en"
+}
+```
+
+## Banking End-to-End Flow (Copy/Paste)
 ```bash
 # 1) Health check
 curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
 
-# 2) Rewrite (POST)
-curl -s -X POST https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite \
+# 2) Show banking endpoints exist
+curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/openapi.json | grep -n "/banking"
+
+# 3) Real rewrite request
+curl -i -X POST \
+  "https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "This product will give you excellent returns and is risk-free. You should buy.",
-    "audience": "client",
-    "language": "en"
+    "email":"This product will give you excellent returns and is risk-free. You should buy today.",
+    "audience":"client",
+    "language":"en"
   }' | jq .
 
-# Example response (redacted):
-# {
-#   "rewritten_email": "...",
-#   "risk_level": "high",
-#   "flagged_phrases": ["will give you excellent returns","risk-free","you should buy"],
-#   "disclaimer_added": true,
-#   "rationale": "Detected 3 risky phrase(s)..."
-#   "trace_id": "REPLACE_WITH_REAL_TRACE_ID_IF_YOUR_API_RETURNS_IT"
-# }
-
-# 3) Fetch review by trace_id (if your system stores it)
+# 4) Fetch review by trace_id (if your system stores it)
 curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/reviews/<TRACE_ID> | jq .
 ```
+
+Example response (real):
+```json
+{
+  "rewritten_email": "This product may give you excellent returns and is lower-risk. you may wish to buy today.\n\nDisclaimer: This message is for information purposes only and does not constitute investment advice. Any decision should be based on your risk profile and suitability assessment.",
+  "risk_level": "high",
+  "flagged_phrases": [
+    "will give you excellent returns",
+    "risk-free",
+    "you should buy"
+  ],
+  "disclaimer_added": true,
+  "rationale": "Detected 3 risky phrase(s). Risk classified as high. Added disclaimer."
+}
+```
+
+## Architecture (Tiny but Clear)
+FastAPI routes:
+- /banking/health
+- /banking/rewrite
+
+Banking rewrite logic:
+- src/banking/rewrite_service.py
+
+Models:
+- src/banking/schemas.py
+
+Core logic:
+- _find_flagged_phrases() -> flagged_phrases
+- _risk_level() -> risk_level
+- _rewrite_minimal() -> safe rewrite
+- disclaimer appended for audience=client|external
+
+## Build and Deploy (ARM Mac -> Azure amd64)
+Build and push (Azure compatible):
+```bash
+docker buildx create --name mof-builder --use
+docker buildx inspect --bootstrap
+
+docker buildx build \
+  --platform linux/amd64 \
+  -t mofasshara/pharma-email-assistant:banking-v2 \
+  --push .
+```
+
+Azure Container settings:
+- Container type: Single container
+- Registry: docker.io
+- Image: mofasshara/pharma-email-assistant:banking-v2
+- Startup command: (blank)
+- Restart app after save
+
+## Risk Classification: Fast Visible Value
+- Reduces advisory language to "informational tone"
+- Adds disclaimer automatically for external comms
+- Produces explainable output: flagged_phrases + rationale
 
 ## Banking Risk Rewriter — Review Workflow (Human-in-the-loop)
 Endpoints

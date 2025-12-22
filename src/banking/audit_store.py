@@ -1,9 +1,24 @@
 import json
+import os
 from collections import deque
 from pathlib import Path
 from typing import Any
 
-AUDIT_DIR = Path("/home") / "audit"
+def _select_audit_dir() -> Path:
+    env_dir = os.getenv("BANKING_AUDIT_DIR")
+    if env_dir:
+        return Path(env_dir)
+
+    home_dir = Path("/home")
+    preferred = home_dir / "audit"
+    if preferred.exists() and os.access(preferred, os.W_OK):
+        return preferred
+    if home_dir.exists() and os.access(home_dir, os.W_OK):
+        return preferred
+    return Path("data") / "audit"
+
+
+AUDIT_DIR = _select_audit_dir()
 AUDIT_FILE = AUDIT_DIR / "banking_rewrites.jsonl"
 REVIEW_EVENTS_FILE = AUDIT_DIR / "banking_review_events.jsonl"
 
