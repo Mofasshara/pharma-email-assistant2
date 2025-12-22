@@ -5,29 +5,22 @@ from typing import List
 
 from src.banking.schemas import BankingRewriteRequest, BankingRewriteResponse
 from src.banking.audit_store import append_record
-
-RISKY_PHRASES = [
-    "guaranteed returns",
-    "will give you excellent returns",
-    "risk-free",
-    "no risk",
-    "you should buy",
-    "i recommend you invest",
-]
+from platform_layer.policies.loader import load_policy
+from platform_layer.runtime.context import RuntimeContext
 
 MAX_LEN = 5000
 
-DISCLAIMER = (
-    "\n\nDisclaimer: This message is for information purposes only and does not "
-    "constitute investment advice. Any decision should be based on your risk "
-    "profile and suitability assessment."
-)
+def _flatten_risk_phrases(risk_phrases: dict) -> List[str]:
+    phrases: List[str] = []
+    for level in ("high", "medium"):
+        phrases.extend(risk_phrases.get(level, []))
+    return phrases
 
 
-def _find_flagged_phrases(text: str) -> List[str]:
+def _find_flagged_phrases(text: str, phrases: List[str]) -> List[str]:
     lowered = text.lower()
     found = []
-    for phrase in RISKY_PHRASES:
+    for phrase in phrases:
         if phrase in lowered:
             found.append(phrase)
     return found
@@ -60,7 +53,15 @@ def _post_process(rewritten: str) -> str:
     return _rewrite_minimal(rewritten)
 
 
-def rewrite_banking_email(req: BankingRewriteRequest) -> BankingRewriteResponse:
+def rewrite_banking_email(
+    req: BankingRewriteRequest,
+    ctx: RuntimeContext,
+) -> BankingRewriteResponse:
+    policy = load_policy(ctx.domain)
+    risk_phrases = _flatten_risk_phrases(policy.get("risk_phrases", {}))
+    disclaimer_required_for = set(policy.get("disclaimer", {}).get("required_for", []))
+    disclaimer_text = policy.get("disclaimer", {}).get("text", "")
+
     trace_id = str(uuid.uuid4())
     created_at = datetime.utcnow().isoformat() + "Z"
     email = req.email.strip()
@@ -69,16 +70,16 @@ def rewrite_banking_email(req: BankingRewriteRequest) -> BankingRewriteResponse:
     if len(email) > MAX_LEN:
         raise ValueError(f"email too long (max {MAX_LEN})")
 
-    flagged = _find_flagged_phrases(email)
+    flagged = _find_flagged_phrases(email, risk_phrases)
     risk = _risk_level(flagged)
 
     rewritten = _rewrite_minimal(email)
     post_check_note = None
-    remaining = _find_flagged_phrases(rewritten)
+    remaining = _find_flagged_phrases(rewritten, risk_phrases)
     if remaining:
         # Second pass to soften leftover risky phrases.
         rewritten = _rewrite_minimal(rewritten)
-        remaining = _find_flagged_phrases(rewritten)
+        remaining = _find_flagged_phrases(rewritten, risk_phrases)
         if remaining:
             post_check_note = "Post-check: risky language remained; softened further."
 
@@ -86,9 +87,10 @@ def rewrite_banking_email(req: BankingRewriteRequest) -> BankingRewriteResponse:
 
     # Always append disclaimer for client-facing messages
     disclaimer_added = True
-    if req.audience.lower() in {"client", "external"}:
-        if DISCLAIMER not in rewritten:
-            rewritten = rewritten + DISCLAIMER
+    if ctx.audience.lower() in disclaimer_required_for:
+        disclaimer = f"\n\n{disclaimer_text}" if disclaimer_text else ""
+        if disclaimer and disclaimer not in rewritten:
+            rewritten = rewritten + disclaimer
     else:
         # internal emails may not need disclaimer
         disclaimer_added = False

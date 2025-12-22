@@ -7,6 +7,7 @@ from src.banking.schemas import (
 )
 from src.banking.rewrite_service import rewrite_banking_email
 from src.banking.audit_store import append_record, append_review_event, get_record, list_records
+from platform_layer.runtime.context import RuntimeContext
 
 router = APIRouter(prefix="/banking", tags=["banking"])
 
@@ -19,7 +20,12 @@ def banking_health():
 @router.post("/rewrite", response_model=BankingRewriteResponse)
 def banking_rewrite(req: BankingRewriteRequest):
     try:
-        return rewrite_banking_email(req)
+        ctx = RuntimeContext(
+            domain="banking",
+            audience=req.audience,
+            language=req.language,
+        )
+        return rewrite_banking_email(req, ctx)
     except Exception:
         raise HTTPException(status_code=500, detail="Banking rewrite failed")
 

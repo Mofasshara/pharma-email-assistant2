@@ -1,0 +1,20 @@
+domain: banking
+
+risk_phrases:
+  high:
+    - "guaranteed returns"
+    - "risk-free"
+    - "no risk"
+  medium:
+    - "will give you excellent returns"
+    - "you should buy"
+    - "i recommend you invest"
+
+disclaimer:
+  required_for:
+    - client
+    - external
+  text: >
+    Disclaimer: This message is for information purposes only and does not
+    constitute investment advice. Any decision should be based
+    on your risk profile and suitability assessment.

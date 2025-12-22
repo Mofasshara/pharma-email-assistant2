@@ -1,6 +1,7 @@
 from src.banking import audit_store
 from src.banking.api import banking_review_action
 from src.banking.schemas import BankingRewriteRequest, ReviewActionRequest
+from platform_layer.runtime.context import RuntimeContext
 from src.banking.rewrite_service import rewrite_banking_email
 
 
@@ -20,7 +21,8 @@ def _create_record():
         audience="client",
         language="en",
     )
-    return rewrite_banking_email(req)
+    ctx = RuntimeContext(domain="banking", audience=req.audience, language=req.language)
+    return rewrite_banking_email(req, ctx)
 
 
 def test_audit_write_and_read(tmp_path, monkeypatch):
