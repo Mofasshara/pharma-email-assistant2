@@ -168,6 +168,25 @@ Azure Container settings:
 - Adds disclaimer automatically for external comms
 - Produces explainable output: flagged_phrases + rationale
 
+## Platform Architecture
+This system separates:
+- Platform concerns (policy, audit, runtime context)
+- Domain logic (banking, pharma)
+
+This enables:
+- Regulated deployments
+- Domain-specific rules without code duplication
+- Auditability and explainability
+
+Flow:
+Request
+  -> Runtime Context
+  -> Policy Loader
+  -> Deterministic Risk Layer
+  -> LLM (optional)
+  -> Audit Log
+  -> Response
+
 ## Banking Risk Rewriter — Review Workflow (Human-in-the-loop)
 Endpoints
 
