@@ -8,6 +8,6 @@ curl -i -X POST \
   -H "Content-Type: application/json" \
   -d '{
     "email": "This investment guarantees high returns with minimal risk.",
-    "audience": "private_banking_client",
+    "audience": "client",
     "language": "en"
   }'

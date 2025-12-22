@@ -1,0 +1,3 @@
+{"trace_id": "3a4c699c-2ad6-4030-b3b7-1cf1ec10d46a", "action": "approve", "reviewer": "compliance_user", "comment": "Reviewed and approved.", "edited_email": null}
+{"trace_id": "3a4c699c-2ad6-4030-b3b7-1cf1ec10d46a", "action": "reject", "reviewer": "compliance_user", "comment": "Too promotional.", "edited_email": null}
+{"trace_id": "3a4c699c-2ad6-4030-b3b7-1cf1ec10d46a", "action": "edit", "reviewer": "compliance_user", "comment": "Softened language.", "edited_email": "Updated compliant version of the email."}

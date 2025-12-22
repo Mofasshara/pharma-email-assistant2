@@ -1,11 +1,6 @@
-id,audience,input_email
-1,Client,"This product will guarantee great returns, you should invest now."
-2,Client,"Here is the monthly statement attached. Let me know if you have questions."
-3,Client,"This fund is the best option and will outperform the market."
-4,Client,"Please review the attached risk profile form and confirm accuracy."
-5,Client,"This is risk-free and perfect for you."
-6,Client,"We can discuss options depending on your objectives and risk tolerance."
-7,Client,"I recommend moving everything into this product for safe profit."
-8,Client,"This message is informational only. We can schedule a call to discuss."
-9,Client,"This strategy will certainly deliver profits."
-10,Client,"Thank you for your time today. Happy to clarify any details."
+id,audience,email,language
+1,client,"This product will give you excellent returns and is risk-free. You should buy today.",en
+2,client,"Here is your monthly statement attached. Let me know if you have questions.",en
+3,internal,"Please confirm KYC documentation is complete before onboarding.",en
+4,client,"These are guaranteed returns with no risk.",en
+5,internal,"Reminder: disclosure text must be included in all client outreach.",en

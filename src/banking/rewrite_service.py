@@ -1,7 +1,10 @@
 import re
+import uuid
+from datetime import datetime
 from typing import List
 
 from src.banking.schemas import BankingRewriteRequest, BankingRewriteResponse
+from src.banking.audit_store import append_record
 
 RISKY_PHRASES = [
     "guaranteed returns",
@@ -52,10 +55,20 @@ def _rewrite_minimal(email: str) -> str:
 
 
 def rewrite_banking_email(req: BankingRewriteRequest) -> BankingRewriteResponse:
+    trace_id = str(uuid.uuid4())
+    created_at = datetime.utcnow().isoformat() + "Z"
     flagged = _find_flagged_phrases(req.email)
     risk = _risk_level(flagged)
 
     rewritten = _rewrite_minimal(req.email)
+    post_check_note = None
+    remaining = _find_flagged_phrases(rewritten)
+    if remaining:
+        # Second pass to soften leftover risky phrases.
+        rewritten = _rewrite_minimal(rewritten)
+        remaining = _find_flagged_phrases(rewritten)
+        if remaining:
+            post_check_note = "Post-check: risky language remained; softened further."
 
     # Always append disclaimer for client-facing messages
     disclaimer_added = True
@@ -76,11 +89,24 @@ def rewrite_banking_email(req: BankingRewriteRequest) -> BankingRewriteResponse:
         f"Risk classified as {risk}. "
         f"{disclaimer_note}"
     )
+    if post_check_note:
+        rationale = f"{rationale} {post_check_note}"
 
-    return BankingRewriteResponse(
+    response = BankingRewriteResponse(
         rewritten_email=rewritten,
         risk_level=risk,
         flagged_phrases=flagged,
         disclaimer_added=disclaimer_added,
+        trace_id=trace_id,
+        created_at=created_at,
         rationale=rationale,
     )
+    record = {
+        "trace_id": trace_id,
+        "created_at": created_at,
+        "review_status": response.review_status,
+        "request": req.model_dump(),
+        "response": response.model_dump(),
+    }
+    append_record(record)
+    return response

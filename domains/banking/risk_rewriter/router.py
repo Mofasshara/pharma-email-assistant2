@@ -9,6 +9,11 @@ from domains.banking.risk_rewriter.service import banking_risk_rewrite
 router = APIRouter(prefix="/banking", tags=["Banking"])
 
 
+@router.get("/health")
+def health():
+    return {"status": "ok", "service": "banking-risk-rewriter"}
+
+
 @router.post("/rewrite", response_model=BankingRewriteResponse)
 def rewrite(req: BankingRewriteRequest):
     try:

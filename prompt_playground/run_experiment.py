@@ -13,6 +13,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.services.rewrite_service import rewrite_email_llm  # noqa: E402
+from src.banking.rewrite_service import rewrite_banking_email  # noqa: E402
+from src.banking.schemas import BankingRewriteRequest  # noqa: E402
 
 BASE = Path("prompt_playground")
 PROMPTS_DIR = BASE / "prompts"
@@ -32,6 +34,7 @@ def main(prompt_key: str, dataset_file: str) -> None:
     prompts = load_registry()["prompts"]
     prompt_meta = prompts[prompt_key]
     prompt_file = prompt_meta["file"]
+    prompt_domain = prompt_meta.get("domain")
 
     dataset_path = DATASETS_DIR / dataset_file
     df = pd.read_csv(dataset_path)
@@ -44,16 +47,29 @@ def main(prompt_key: str, dataset_file: str) -> None:
 
     print(f"[bold]Running[/bold] {prompt_key} on {dataset_file}")
     for _, row in df.iterrows():
-        input_email = row["input_email"]
+        if "email" in row and pd.notna(row["email"]):
+            input_email = row["email"]
+        else:
+            input_email = row["input_email"]
         audience = row["audience"]
+        language = row["language"] if "language" in row and pd.notna(row["language"]) else "en"
 
-        # Uses your existing LLM rewrite function
-        output = rewrite_email_llm(input_email, audience, prompt_override=prompt_text)
+        if prompt_domain == "banking":
+            req = BankingRewriteRequest(
+                email=input_email,
+                audience=audience,
+                language=language,
+            )
+            output = rewrite_banking_email(req).model_dump()
+        else:
+            # Uses your existing LLM rewrite function
+            output = rewrite_email_llm(input_email, audience, prompt_override=prompt_text)
 
         record = {
             "id": int(row["id"]),
             "audience": audience,
             "input_email": input_email,
+            "language": language,
             "prompt_key": prompt_key,
             "output": output,
         }

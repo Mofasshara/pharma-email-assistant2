@@ -6,7 +6,7 @@ It classifies risk level, flags risky phrases, and injects a disclaimer when nee
 ## What it does
 Given:
 - `email`: client message draft
-- `audience`: e.g. `client`, `internal`, `compliance`
+- `audience`: e.g. `client`, `internal`, `external`
 - `language`: default `en`
 
 Returns:
@@ -15,6 +15,247 @@ Returns:
 - `flagged_phrases` (list)
 - `disclaimer_added` (bool)
 - `rationale` (short explanation)
+
+## Banking API
+What it does:
+- Rewrites client-facing drafts to remove risky language.
+- Flags risky phrases and adds a disclaimer when needed.
+
+Why banks care:
+- Compliance-safe rewriting and audit-friendly rationale.
+
+Endpoints:
+- `GET /banking/health`
+- `POST /banking/rewrite`
+
+Local (copy/paste):
+```bash
+curl -s http://localhost:8081/banking/health
+curl -s http://localhost:8081/banking/rewrite \
+  -H "Content-Type: application/json" \
+  -d '{"email":"This product will give you excellent returns and is risk-free. You should buy today.","audience":"client","language":"en"}' | jq
+```
+
+Azure (copy/paste):
+```bash
+curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
+curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite \
+  -H "Content-Type: application/json" \
+  -d '{"email":"This product will give you excellent returns and is risk-free. You should buy today.","audience":"client","language":"en"}'
+```
+
+## Banking Risk Rewriter — Review Workflow (Human-in-the-loop)
+Endpoints
+
+GET /banking/health
+
+POST /banking/rewrite
+
+GET /banking/reviews (lists recent audit items)
+
+GET /banking/reviews/{trace_id} (fetch one audit item)
+
+POST /banking/reviews/{trace_id}/action (approve / reject / edit)
+
+Response fields (important)
+
+Every rewrite returns:
+- trace_id — unique id used for audit + review
+- created_at — timestamp (UTC ISO)
+- review_status — pending | approve | reject | edit
+
+Explanation: This is the “audit handle” a bank would require.
+
+### Base URLs
+Local
+- API docs: http://localhost:8081/docs
+- Base: http://localhost:8081
+
+Azure
+- Base: https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net
+
+Tip: Replace <BASE_URL> in the examples below with either Local or Azure.
+
+### Full Example Flow (cURL) — Rewrite → Review → Approve/Edit/Reject
+Step 0 — Pick your base URL
+
+Local
+```bash
+export BASE_URL="http://localhost:8081"
+```
+
+Azure
+```bash
+export BASE_URL="https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net"
+```
+
+Step 1 — Health check (sanity)
+```bash
+curl -i "$BASE_URL/banking/health"
+```
+
+Expected: 200 OK with something like:
+```json
+{"status":"ok","service":"banking-risk-rewriter"}
+```
+
+Step 2 — POST a rewrite request
+
+Your current request schema is:
+```json
+{
+  "email": "string",
+  "audience": "string",
+  "language": "en"
+}
+```
+
+Run:
+```bash
+curl -s -X POST "$BASE_URL/banking/rewrite" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "This product will give you excellent returns, it is risk-free, and you should buy today.",
+    "audience": "client",
+    "language": "en"
+  }' | tee /tmp/banking_rewrite_response.json
+```
+
+What this does:
+- Sends a risky banking email
+- Saves the JSON response to /tmp/banking_rewrite_response.json
+
+Step 3 — Extract the trace_id
+
+Option A (recommended) — with jq
+```bash
+TRACE_ID=$(cat /tmp/banking_rewrite_response.json | jq -r '.trace_id')
+echo "TRACE_ID=$TRACE_ID"
+```
+
+Option B — no jq
+```bash
+TRACE_ID=$(python -c "import json; print(json.load(open('/tmp/banking_rewrite_response.json'))['trace_id'])")
+echo "TRACE_ID=$TRACE_ID"
+```
+
+Expected: prints something like:
+```
+TRACE_ID=2b5c7d0a-...-...
+```
+
+Step 4 — List recent reviews (audit queue)
+```bash
+curl -s "$BASE_URL/banking/reviews?limit=10" | tee /tmp/banking_reviews_list.json
+```
+
+Expected:
+- A list of items including your trace_id
+- review_status should be "pending" initially
+
+Step 5 — Fetch the audit item by trace_id
+```bash
+curl -s "$BASE_URL/banking/reviews/$TRACE_ID" | tee /tmp/banking_review_item.json
+```
+
+Expected:
+- Contains request + response
+- Includes trace_id, created_at, review_status
+
+### Review Actions — Approve / Reject / Edit
+A) Approve
+```bash
+curl -s -X POST "$BASE_URL/banking/reviews/$TRACE_ID/action" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "approve",
+    "reviewer": "compliance.reviewer@company.com",
+    "comment": "Approved for client communication."
+  }'
+```
+
+Then verify:
+```bash
+curl -s "$BASE_URL/banking/reviews/$TRACE_ID" | jq '.review_status'
+```
+
+Expected: "approve"
+
+B) Reject
+
+Run a new rewrite first (to get a new trace_id), then:
+```bash
+curl -s -X POST "$BASE_URL/banking/reviews/$TRACE_ID/action" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "reject",
+    "reviewer": "compliance.reviewer@company.com",
+    "comment": "Still contains advisory language; do not send."
+  }'
+```
+
+Verify:
+```bash
+curl -s "$BASE_URL/banking/reviews/$TRACE_ID" | jq '.review_status'
+```
+
+Expected: "reject"
+
+C) Edit (human corrects the output)
+```bash
+curl -s -X POST "$BASE_URL/banking/reviews/$TRACE_ID/action" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "edit",
+    "reviewer": "compliance.reviewer@company.com",
+    "comment": "Adjusted language to remove implied recommendation.",
+    "edited_email": "This product may be suitable depending on your objectives and risk tolerance. Please review the product documentation and consider whether it aligns with your risk profile.\n\nDisclaimer: This message is for information purposes only and does not constitute investment advice. Any decision should be based on your risk profile and suitability assessment."
+  }'
+```
+
+Verify:
+```bash
+curl -s "$BASE_URL/banking/reviews/$TRACE_ID" | jq '.review_status, .response.rewritten_email // .rewritten_email'
+```
+
+Expected:
+- status: "edit"
+- rewritten text updated to your edited email
+
+### Same Flow in Swagger UI (Click-by-click)
+Open:
+- Local: http://localhost:8081/docs
+- Azure: https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/docs
+
+Expand Banking tag
+
+Run POST /banking/rewrite
+
+Copy trace_id from response
+
+Run GET /banking/reviews
+
+Run GET /banking/reviews/{trace_id}
+
+Run POST /banking/reviews/{trace_id}/action with:
+- approve or reject or edit
+
+### JSON structure notes
+Your rewrite response includes:
+- rewritten_email, risk_level, flagged_phrases, disclaimer_added, rationale
+- trace_id, created_at, review_status
+
+If your audit endpoint returns a wrapper like:
+```json
+{
+  "trace_id": "...",
+  "request": {...},
+  "response": {...},
+  "review_status": "pending"
+}
+```
+then the jq lines referencing `.response.rewritten_email` will work.
+If instead it returns only the response shape, use `.rewritten_email`.
 
 ## Live endpoints (Azure)
 - Health: `GET /banking/health`

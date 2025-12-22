@@ -19,3 +19,7 @@ prompts:
     file: ../../shared/prompts/banking/risk_rewrite_v1.txt
     domain: banking
     task: risk_rewrite
+  banking_risk_rewrite_v2:
+    file: ../../shared/prompts/banking/risk_rewrite_v2.txt
+    domain: banking
+    task: risk_rewrite
