@@ -168,6 +168,105 @@ Azure Container settings:
 - Adds disclaimer automatically for external comms
 - Produces explainable output: flagged_phrases + rationale
 
+## End-to-End Banking Risk Flow
+This section explains the full lifecycle of a banking-compliance rewrite request.
+It demonstrates deterministic risk scoring, auditability, traceability, and
+compliance workflows with API-driven review loops.
+
+### 1) Client email -> POST /banking/rewrite
+A client-facing employee sends an email to the API for rewriting and risk
+evaluation.
+
+Example request:
+```bash
+curl -s -X POST https://<your-app>.azurewebsites.net/banking/rewrite \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "This product will give you excellent returns and is risk-free. You should buy.",
+    "audience": "client",
+    "language": "en"
+  }'
+```
+
+### 2) AI rewrite + deterministic risk rules applied
+The system performs two things:
+
+A) AI rewrite
+- Improves tone
+- Removes promotional or risky language
+- Adds required disclaimers
+
+B) Deterministic risk rules
+These rules are not controlled by the LLM. They are policy-driven checks such as:
+- "risk-free" -> high risk
+- "guaranteed" -> high risk
+- "excellent returns" -> medium/high
+- "you should buy" -> high risk
+
+Example response:
+```json
+{
+  "rewritten_email": "Here is a more balanced explanation of the product...",
+  "risk_level": "high",
+  "flagged_phrases": [
+    "excellent returns",
+    "risk-free",
+    "you should buy"
+  ],
+  "disclaimer_added": true,
+  "rationale": "Detected 3 risky phrase(s) based on banking policy.",
+  "trace_id": "b1c2d3e4-f567-8901-2345-6789abcdef01"
+}
+```
+
+### 3) Audit event stored with trace_id
+Every rewrite generates an audit record:
+- original email
+- rewritten email
+- risk level
+- flagged phrases
+- timestamp
+- tenant/domain context
+- review status (pending/approved/rejected)
+
+This is stored under the trace_id and supports compliance, investigations,
+reproducibility, and regulatory audits.
+
+### 4) Compliance retrieves review via /banking/reviews/{trace_id}
+```bash
+curl -s https://<your-app>.azurewebsites.net/banking/reviews/b1c2d3e4-f567-8901-2345-6789abcdef01 | jq .
+```
+
+Example review record:
+```json
+{
+  "trace_id": "b1c2d3e4-f567-8901-2345-6789abcdef01",
+  "original_email": "This product will give you excellent returns...",
+  "rewritten_email": "Here is a more balanced explanation...",
+  "risk_level": "high",
+  "flagged_phrases": [
+    "excellent returns",
+    "risk-free",
+    "you should buy"
+  ],
+  "review_status": "pending",
+  "timestamp": "2025-01-12T14:32:10Z"
+}
+```
+
+### 5) High-risk items flagged for manual review
+If the risk level is "high":
+- The item is marked for manual review
+- Compliance can approve, reject, or request edits via:
+  - `POST /banking/reviews/{trace_id}/action`
+
+### Why this matters (Tech Lead explanation)
+- Auditability: every rewrite is traceable via trace_id
+- Deterministic risk scoring: policy-driven, predictable, testable, and versionable
+- Separation of concerns: rewrite, risk, and audit logic are decoupled
+- Compliance workflow: high-risk items move through a review pipeline
+- Production-grade architecture: clear, structured, operational docs
+
 ## Platform Architecture
 This system separates:
 - Platform concerns (policy, audit, runtime context)

@@ -8,6 +8,7 @@ from src.banking.audit_store import append_record
 from platform_layer.policies.loader import load_policy
 from platform_layer.runtime.context import RuntimeContext
 from platform_layer.audit.logger import log_event
+from storage.banking_audit_log import save_event
 
 MAX_LEN = 5000
 
@@ -126,6 +127,16 @@ def rewrite_banking_email(
             "flagged_phrases": flagged,
             "disclaimer_added": disclaimer_added,
         },
+    )
+    save_event(
+        {
+            "trace_id": trace_id,
+            "timestamp": created_at,
+            "original_email": email,
+            "rewritten_email": rewritten,
+            "risk_level": risk,
+            "flags": flagged,
+        }
     )
     record = {
         "trace_id": trace_id,

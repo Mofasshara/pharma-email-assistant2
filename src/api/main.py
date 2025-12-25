@@ -6,6 +6,7 @@ from loguru import logger
 import traceback
 
 from domains.banking.risk_rewriter.router import router as banking_router
+from domains.banking.review_service.router import router as banking_review_router
 from src.logging_utils import log_request
 from src.safety_checks import basic_safety_check
 from src.services.rewrite_service import rewrite_email_llm
@@ -18,6 +19,7 @@ class EmailRequest(BaseModel):
 
 app = FastAPI(port=8000)
 app.include_router(banking_router)
+app.include_router(banking_review_router)
 
 
 @app.middleware("http")
