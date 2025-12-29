@@ -64,6 +64,24 @@ def list_records(limit: int = 50) -> list[dict[str, Any]]:
     return list(recent)
 
 
+def search_records_by_risk(risk_level: str) -> list[dict[str, Any]]:
+    if not AUDIT_FILE.exists():
+        return []
+    matches: list[dict[str, Any]] = []
+    with AUDIT_FILE.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get("risk_level") == risk_level:
+                matches.append(record)
+    return matches
+
+
 def append_review_event(event: dict[str, Any]) -> None:
     AUDIT_DIR.mkdir(parents=True, exist_ok=True)
     with REVIEW_EVENTS_FILE.open("a", encoding="utf-8") as f:

@@ -7,15 +7,25 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from requests import RequestException
-from src.banking.api import router as banking_router
 from agents.orchestrator import handle_request
 from agents.tools.rewrite_tool import REWRITE_API_URL
 from agents.tools.exceptions import ToolServiceError
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Agent Orchestrator API")
-app.include_router(banking_router)
+app = FastAPI(
+    title="Agent Orchestrator API",
+    description=(
+        "<details><summary>Quick User Guide (click to expand)</summary>\n\n"
+        "**Purpose:** Single entry point that routes requests to the correct service "
+        "(pharma or banking) and can use RAG for knowledge-retrieval tasks.\n\n"
+        "**How to use:**\n"
+        "1) Open `/docs` and expand `POST /agent/handle`.\n"
+        "2) Paste the request body and click **Execute**.\n"
+        "3) Add `\"domain\":\"banking\"` to route to banking.\n"
+        "</details>"
+    ),
+)
 
 
 @app.middleware("http")
@@ -36,6 +46,7 @@ async def add_request_id(request: Request, call_next):
 class AgentRequest(BaseModel):
     email: str
     audience: str
+    domain: str | None = None
 
 
 @app.exception_handler(RequestValidationError)
@@ -47,14 +58,40 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-@app.post("/agent/handle")
+@app.post(
+    "/agent/handle",
+    description=(
+        "Main entry point. Routes to pharma by default, or banking when "
+        "`domain=\"banking\"`.\n\n"
+        "**Pharma example:**\n"
+        "```json\n"
+        "{\n"
+        "  \"email\": \"Please rewrite this client update for clarity.\",\n"
+        "  \"audience\": \"client\"\n"
+        "}\n"
+        "```\n\n"
+        "**Banking example:**\n"
+        "```json\n"
+        "{\n"
+        "  \"email\": \"This product will give you excellent returns and is risk-free.\",\n"
+        "  \"audience\": \"client\",\n"
+        "  \"domain\": \"banking\"\n"
+        "}\n"
+        "```"
+    ),
+)
 def agent_handle(payload: AgentRequest, request: Request):
     request_id = getattr(request.state, "request_id", None)
+    resolved_domain = payload.domain or "pharma"
     try:
         return {
             "response": handle_request(
-                payload.email, payload.audience, request_id=request_id
+                payload.email,
+                payload.audience,
+                domain=payload.domain,
+                request_id=request_id,
             ),
+            "domain": resolved_domain,
             "request_id": request_id,
         }
     except ToolServiceError as exc:
@@ -71,12 +108,18 @@ def agent_handle(payload: AgentRequest, request: Request):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.get("/agent/health")
+@app.get(
+    "/agent/health",
+    description="Health check for the orchestrator service.",
+)
 def agent_health():
     return {"status": "ok", "service": "agent-orchestrator"}
 
 
-@app.get("/agent/deps")
+@app.get(
+    "/agent/deps",
+    description="Checks connectivity to downstream rewrite services.",
+)
 def agent_deps(request: Request):
     request_id = getattr(request.state, "request_id", None)
 

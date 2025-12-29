@@ -6,18 +6,41 @@ from src.banking.schemas import (
     ReviewActionRequest,
 )
 from src.banking.rewrite_service import rewrite_banking_email
-from src.banking.audit_store import append_record, append_review_event, get_record, list_records
+from src.banking.audit_store import (
+    append_record,
+    append_review_event,
+    get_record,
+    list_records,
+    search_records_by_risk,
+)
 from platform_layer.runtime.context import RuntimeContext
 
 router = APIRouter(prefix="/banking", tags=["banking"])
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    description="Health check for the banking rewrite service.",
+)
 def banking_health():
     return {"status": "ok", "service": "banking-risk-rewriter"}
 
 
-@router.post("/rewrite", response_model=BankingRewriteResponse)
+@router.post(
+    "/rewrite",
+    response_model=BankingRewriteResponse,
+    description=(
+        "Rewrite a client email and return risk flags + disclaimer status.\n\n"
+        "**Example:**\n"
+        "```json\n"
+        "{\n"
+        "  \"email\": \"This product will give you excellent returns and is risk-free. You should buy today.\",\n"
+        "  \"audience\": \"client\",\n"
+        "  \"language\": \"en\"\n"
+        "}\n"
+        "```"
+    ),
+)
 def banking_rewrite(req: BankingRewriteRequest):
     try:
         ctx = RuntimeContext(
@@ -30,12 +53,18 @@ def banking_rewrite(req: BankingRewriteRequest):
         raise HTTPException(status_code=500, detail="Banking rewrite failed")
 
 
-@router.get("/reviews")
+@router.get(
+    "/reviews",
+    description="List recent audit records.",
+)
 def banking_reviews(limit: int = 50):
     return {"items": list_records(limit=limit)}
 
 
-@router.get("/reviews/{trace_id}")
+@router.get(
+    "/reviews/{trace_id}",
+    description="Fetch a single audit record by trace_id.",
+)
 def banking_review(trace_id: str):
     record = get_record(trace_id)
     if not record:
@@ -43,7 +72,28 @@ def banking_review(trace_id: str):
     return record
 
 
-@router.post("/reviews/{trace_id}/action")
+@router.get(
+    "/reviews/search/by-risk",
+    description="Filter audit records by risk level (low/medium/high).",
+)
+def banking_reviews_by_risk(risk: str):
+    return {"items": search_records_by_risk(risk)}
+
+
+@router.post(
+    "/reviews/{trace_id}/action",
+    description=(
+        "Approve, reject, or edit a rewrite.\n\n"
+        "**Approve example:**\n"
+        "```json\n"
+        "{\n"
+        "  \"action\": \"approve\",\n"
+        "  \"reviewer\": \"compliance.reviewer@company.com\",\n"
+        "  \"comment\": \"Approved for client communication.\"\n"
+        "}\n"
+        "```"
+    ),
+)
 def banking_review_action(trace_id: str, payload: ReviewActionRequest):
     record = get_record(trace_id)
     if not record:

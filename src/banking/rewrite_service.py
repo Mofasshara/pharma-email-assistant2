@@ -9,6 +9,7 @@ from platform_layer.policies.loader import load_policy
 from platform_layer.runtime.context import RuntimeContext
 from platform_layer.audit.logger import log_event
 from storage.banking_audit_log import save_event
+from src.services.rag_client import fetch_rag_answer, should_use_rag
 
 MAX_LEN = 5000
 
@@ -87,6 +88,17 @@ def rewrite_banking_email(
 
     rewritten = _post_process(rewritten)
 
+    rag_note = None
+    if should_use_rag(email):
+        rag_info = fetch_rag_answer(email, request_id=trace_id)
+        if rag_info:
+            rewritten = (
+                f"{rewritten}\n\n"
+                "Reference context (internal documents):\n"
+                f"{rag_info['answer']}"
+            )
+            rag_note = "RAG context used."
+
     # Always append disclaimer for client-facing messages
     disclaimer_added = True
     if ctx.audience.lower() in disclaimer_required_for:
@@ -109,6 +121,8 @@ def rewrite_banking_email(
     )
     if post_check_note:
         rationale = f"{rationale} {post_check_note}"
+    if rag_note:
+        rationale = f"{rationale} {rag_note}"
 
     response = BankingRewriteResponse(
         rewritten_email=rewritten,

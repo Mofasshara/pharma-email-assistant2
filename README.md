@@ -1,9 +1,156 @@
-# Banking Client Communication Risk Rewriter (FINMA-style guardrails)
+# Pharma + Banking GenAI Platform
 
+A multi-service FastAPI platform with three domain-separated apps
+(banking, pharma, orchestrator) plus a dedicated RAG service.
+
+## Service Split Summary
+- Banking Risk Rewriter: `/banking/*` endpoints and audit/review flow.
+- Agent Orchestrator: `/agent/*` endpoints only (no banking/pharma routes).
+- Pharma Email Rewriter: `/rewrite` and `/feedback` endpoints.
+- RAG Service: `/rag/*` endpoints for document-grounded answers.
+
+## Jump to
+- [Banking](#banking-client-communication-risk-rewriter-finma-style-guardrails)
+- [Orchestrator](#live-deployments-azure)
+- [Pharma](#pharma-email-assistant)
+
+## Live Deployments (Azure)
+- Banking Risk Rewriter API: https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/docs
+- Agent Orchestrator API: https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/docs
+- Pharma Email Rewriter API: https://pharma-email-rewrite-mofr-gph0dueeegetf9gr.westeurope-01.azurewebsites.net/docs
+- RAG Service API: https://rag-mofr-fhhseqb2c0etaeh9.westeurope-01.azurewebsites.net/docs
+
+## Orchestrator (Agent) Overview
+In simple words: the orchestrator is the "traffic controller" that receives a request,
+picks the right tool (like the rewrite service), and returns the result with a request ID.
+
+Endpoints:
+- `GET /agent/health`
+- `POST /agent/handle`
+- `GET /agent/deps`
+
+### Quick User Guide (Orchestrator)
+1) Open: https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/docs
+2) Click **POST /agent/handle** → **Try it out**.
+3) Paste a body and click **Execute**.
+4) For banking, include `"domain": "banking"`.
+
+Example (pharma):
+```json
+{
+  "email": "Please rewrite this client update for clarity.",
+  "audience": "client"
+}
+```
+
+Example (banking):
+```json
+{
+  "email": "This product will give you excellent returns and is risk-free.",
+  "audience": "client",
+  "domain": "banking"
+}
+```
+
+### How to use each endpoint (Orchestrator)
+`GET /agent/health`
+- Purpose: quick uptime check (should return 200 OK).
+- Use it when you want to verify the service is running.
+
+`POST /agent/handle`
+- Purpose: the main entry point that routes your request.
+- Use it to rewrite a pharma email, or add `"domain":"banking"` to route to banking.
+- Example body (pharma):
+```json
+{
+  "email": "Please rewrite this client update for clarity.",
+  "audience": "client"
+}
+```
+- Example body (banking):
+```json
+{
+  "email": "This product will give you excellent returns and is risk-free.",
+  "audience": "client",
+  "domain": "banking"
+}
+```
+
+`GET /agent/deps`
+- Purpose: checks if the downstream rewrite service is reachable.
+- Use it for debugging if `/agent/handle` is failing.
+
+Routing rule:
+- If `domain` is `"banking"`, it routes to the banking rewrite service.
+- Otherwise it routes to the pharma rewrite service (default).
+- It may choose RAG if the router decides the request needs retrieval (via `RAG_API_URL`).
+
+Orchestrator smoke test:
+```bash
+curl -i -X POST https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/agent/handle \
+  -H "Content-Type: application/json" \
+  -d '{"email":"Test email for orchestrator","audience":"client"}'
+```
+
+Example response (real):
+```json
+{
+  "response": {
+    "rewritten_email": "Subject: Coordination of Upcoming Medical Affairs Initiatives\n\nDear Team,\n\nI hope this message finds you well. This email serves as a preliminary communication regarding the orchestration of our upcoming initiatives within the Medical Affairs department. \n\nPlease prepare to discuss the objectives and timelines associated with these initiatives in our next meeting. Your insights and expertise will be invaluable in ensuring our efforts align with our strategic goals.\n\nThank you for your attention to this matter.\n\nBest regards,\n\n[Your Name]\n[Your Position]",
+    "metadata": {
+      "latency_ms": 4813,
+      "tokens": {
+        "prompt_tokens": 99,
+        "completion_tokens": 193,
+        "total_tokens": 292
+      },
+      "model": "gpt-4o-mini"
+    }
+  },
+  "request_id": "1744716d-72e0-4186-a2f4-b5cb72fe671c"
+}
+```
+
+### How it works (step-by-step)
+1) Receive request at `POST /agent/handle`.
+2) Generate a `request_id` for traceability.
+3) If `domain="banking"`, call the banking rewrite tool.
+4) Otherwise, choose between RAG and pharma rewrite.
+5) Run safety evaluation on the output.
+6) Return the response with `request_id`.
+
+Orchestrator banking route (real):
+```bash
+curl -i -X POST https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/agent/handle \
+  -H "Content-Type: application/json" \
+  -d '{"email":"This product will give you excellent returns and is risk-free.","audience":"client","domain":"banking"}'
+```
+
+Example response (real):
+```json
+{
+  "response": {
+    "rewritten_email": "This product may give you excellent returns and is lower-risk.\n\nDisclaimer: This message is for information purposes only and does not constitute investment advice. Any decision should be based on your risk profile and suitability assessment.\n",
+    "risk_level": "medium",
+    "flagged_phrases": [
+      "risk-free",
+      "will give you excellent returns"
+    ],
+    "disclaimer_added": true,
+    "trace_id": "7d2353da-ce21-41a7-b728-49532204fde6",
+    "created_at": "2025-12-26T19:46:36.658976Z",
+    "review_status": "pending",
+    "rationale": "Detected 2 risky phrase(s). Risk classified as medium. Added disclaimer."
+  },
+  "request_id": "ab484424-dc91-45b1-8455-4fe42994929f"
+}
+```
+
+## Banking Client Communication Risk Rewriter (FINMA-style guardrails)
 A FastAPI service that rewrites relationship-manager emails to reduce regulatory/compliance risk.
 It classifies risk level, flags risky phrases, and injects a disclaimer when needed.
 
-## What it does
+### What it does
 Given:
 - `email`: client message draft
 - `audience`: e.g. `client`, `internal`, `external`
@@ -16,7 +163,31 @@ Returns:
 - `disclaimer_added` (bool)
 - `rationale` (short explanation)
 
-## Banking API
+### Quick User Guide (Banking)
+1) Open: https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/docs
+2) Click **POST /banking/rewrite** → **Try it out**.
+3) Paste a body and click **Execute**.
+4) Copy the `trace_id` if you want to fetch the audit record.
+
+Example:
+```json
+{
+  "email": "This product will give you excellent returns and is risk-free. You should buy today.",
+  "audience": "client",
+  "language": "en"
+}
+```
+
+### How it works (step-by-step)
+1) Receive request at `POST /banking/rewrite`.
+2) Normalize input and scan for risky phrases.
+3) Classify risk level (low/medium/high).
+4) Rewrite risky language with safer phrasing.
+5) Append disclaimer for client/external audiences.
+6) Generate `trace_id` + `created_at` and store audit record.
+7) Return the structured response.
+
+### Banking API
 What it does:
 - Rewrites client-facing drafts to remove risky language.
 - Flags risky phrases and adds a disclaimer when needed.
@@ -27,6 +198,48 @@ Why banks care:
 Endpoints:
 - `GET /banking/health`
 - `POST /banking/rewrite`
+- `GET /banking/reviews`
+- `GET /banking/reviews/{trace_id}`
+- `GET /banking/reviews/search/by-risk`
+- `POST /banking/reviews/{trace_id}/action`
+
+### How to use each endpoint (Banking)
+`GET /banking/health`
+- Purpose: quick uptime check.
+
+`POST /banking/rewrite`
+- Purpose: rewrite a client email and get risk flags + disclaimer.
+- Example body:
+```json
+{
+  "email": "This product will give you excellent returns and is risk-free. You should buy today.",
+  "audience": "client",
+  "language": "en"
+}
+```
+
+`GET /banking/reviews`
+- Purpose: list recent audit records.
+- Use it after running `/banking/rewrite` to see the latest items.
+
+`GET /banking/reviews/{trace_id}`
+- Purpose: fetch one audit record by trace ID.
+- Use the `trace_id` returned from `/banking/rewrite`.
+
+`GET /banking/reviews/search/by-risk?risk=high`
+- Purpose: filter audit records by risk level.
+- Example: `risk=high` or `risk=medium`.
+
+`POST /banking/reviews/{trace_id}/action`
+- Purpose: approve, reject, or edit a rewrite.
+- Example body:
+```json
+{
+  "action": "approve",
+  "reviewer": "compliance.reviewer@company.com",
+  "comment": "Approved for client communication."
+}
+```
 
 Local (copy/paste):
 ```bash
@@ -38,8 +251,8 @@ curl -s http://localhost:8081/banking/rewrite \
 
 Azure (copy/paste):
 ```bash
-curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
-curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite \
+curl -i https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/health
+curl -s https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/rewrite \
   -H "Content-Type: application/json" \
   -d '{"email":"This product will give you excellent returns and is risk-free. You should buy today.","audience":"client","language":"en"}'
 ```
@@ -47,24 +260,24 @@ curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azure
 ## Quickstart
 Local run:
 ```bash
-python -m uvicorn agents.api:app --reload --port 8081
+python -m uvicorn src.banking.app:app --reload --port 8081
 ```
 
 Docker run:
 ```bash
-docker run --rm -p 8081:80 mofasshara/pharma-email-assistant:banking-v2
+docker run --rm -p 8081:80 mofasshara/pharma-email-assistant:banking-v4
 ```
 
 Azure endpoints:
 ```text
-https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
-https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite
+https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/health
+https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/rewrite
 ```
 
 Example curl flow:
 ```bash
-curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
-curl -s -X POST https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite \
+curl -i https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/health
+curl -s -X POST https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/rewrite \
   -H "Content-Type: application/json" \
   -d '{"email":"This product will give you excellent returns and is risk-free. You should buy.","audience":"client","language":"en"}' | jq .
 ```
@@ -78,7 +291,7 @@ curl -s -X POST https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-
 ## Public Endpoints (Production URLs)
 Health
 ```bash
-curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
+curl -i https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/health
 ```
 
 Rewrite
@@ -93,14 +306,14 @@ Rewrite
 ## Banking End-to-End Flow (Copy/Paste)
 ```bash
 # 1) Health check
-curl -i https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health
+curl -i https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/health
 
 # 2) Show banking endpoints exist
-curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/openapi.json | grep -n "/banking"
+curl -s https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/openapi.json | grep -n "/banking"
 
 # 3) Real rewrite request
 curl -i -X POST \
-  "https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite" \
+  "https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/rewrite" \
   -H "Content-Type: application/json" \
   -d '{
     "email":"This product will give you excellent returns and is risk-free. You should buy today.",
@@ -109,7 +322,7 @@ curl -i -X POST \
   }' | jq .
 
 # 4) Fetch review by trace_id (if your system stores it)
-curl -s https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/reviews/<TRACE_ID> | jq .
+curl -s https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/reviews/<TRACE_ID> | jq .
 ```
 
 Example response (real):
@@ -152,15 +365,15 @@ docker buildx inspect --bootstrap
 
 docker buildx build \
   --platform linux/amd64 \
-  -t mofasshara/pharma-email-assistant:banking-v2 \
+  -t mofasshara/pharma-email-assistant:banking-v4 \
   --push .
 ```
 
 Azure Container settings:
 - Container type: Single container
 - Registry: docker.io
-- Image: mofasshara/pharma-email-assistant:banking-v2
-- Startup command: (blank)
+- Image: mofasshara/pharma-email-assistant:banking-v4
+- Startup command: `uvicorn src.banking.app:app --host 0.0.0.0 --port 80`
 - Restart app after save
 
 ## Risk Classification: Fast Visible Value
@@ -314,7 +527,7 @@ Local
 - Base: http://localhost:8081
 
 Azure
-- Base: https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net
+- Base: https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net
 
 Tip: Replace <BASE_URL> in the examples below with either Local or Azure.
 
@@ -328,7 +541,7 @@ export BASE_URL="http://localhost:8081"
 
 Azure
 ```bash
-export BASE_URL="https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net"
+export BASE_URL="https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net"
 ```
 
 Step 1 — Health check (sanity)
@@ -467,7 +680,7 @@ Expected:
 ### Same Flow in Swagger UI (Click-by-click)
 Open:
 - Local: http://localhost:8081/docs
-- Azure: https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/docs
+- Azure: https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/docs
 
 Expand Banking tag
 
@@ -505,7 +718,7 @@ If instead it returns only the response shape, use `.rewritten_email`.
 - OpenAPI: `/docs` and `/openapi.json`
 
 Example:
-- `https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health`
+- `https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/health`
 
 ## API schema
 ### POST /banking/rewrite
@@ -533,13 +746,13 @@ Quick test (curl)
 
 Health:
 ```bash
-curl -i "https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/health"
+curl -i "https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/health"
 ```
 
 Rewrite:
 ```bash
 curl -i -X POST \
-  "https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/banking/rewrite" \
+  "https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/banking/rewrite" \
   -H "Content-Type: application/json" \
   -d '{"email":"This product will give you excellent returns. You should invest now.","audience":"client","language":"en"}'
 ```
@@ -553,14 +766,13 @@ docker build -t pharma-email-assistant:local .
 
 Run:
 ```bash
-docker run --rm -p 8080:8080 \
-  -e PORT=8080 \
+docker run --rm -p 8081:80 \
   pharma-email-assistant:local
 ```
 
 Test locally:
 ```bash
-curl -i http://localhost:8080/banking/health
+curl -i http://localhost:8081/banking/health
 ```
 
 ARM Mac + Azure (AMD64) build
@@ -569,7 +781,7 @@ If you're on an ARM64 Mac, build an AMD64 image for Azure:
 ```bash
 docker buildx create --use --name multiarch || docker buildx use multiarch
 docker buildx build --platform linux/amd64 \
-  -t mofasshara/pharma-email-assistant:banking-v2 \
+  -t mofasshara/pharma-email-assistant:banking-v4 \
   --push .
 ```
 
@@ -597,8 +809,9 @@ Client -> FastAPI (`/banking/rewrite`)
 ## Azure App Service (container) settings
 - Container type: Single container
 - Registry: docker.io
-- Image: mofasshara/pharma-email-assistant:banking-v2
-- Port: 8080 (via PORT env var, if used)
+- Image: mofasshara/pharma-email-assistant:banking-v4
+- Startup command: `uvicorn src.banking.app:app --host 0.0.0.0 --port 80`
+- Port: 80 (via WEBSITES_PORT)
 
 # pharma-email-assistant2
 AI-powered email rewriting assistant for medical/pharma use cases.
@@ -629,15 +842,63 @@ AI-powered email rewriting assistant for medical/pharma use cases.
 - The dataset includes: input, audience, output, feedback, and compliance tags.
 - This dataset is then used for evaluation or fine-tuning in Month 3.
 
-- # Pharma Email Assistant
+# Pharma Email Assistant
 
 A FastAPI-based application that rewrites pharma-related emails using OpenAI models.  
 Deployed on Azure App Service with Docker.
 
+## Quick User Guide (Pharma)
+1) Open: https://pharma-email-rewrite-mofr-gph0dueeegetf9gr.westeurope-01.azurewebsites.net/docs
+2) Click **POST /rewrite** → **Try it out**.
+3) Paste a body and click **Execute**.
+
+Example:
+```json
+{
+  "text": "This product guarantees the best patient outcomes.",
+  "audience": "medical affairs"
+}
+```
+
+## Pharma Email Rewriter (How it works)
+1) Receive request at `POST /rewrite` with `text` and `audience`.
+2) Run safety checks on the input.
+3) Rewrite the email using the pharma prompt for the audience.
+4) Run safety checks on the output.
+5) Log the request/output for evaluation.
+6) Return the rewritten email (or an error if blocked).
+
+## Pharma API (How to use each endpoint)
+`GET /`
+- Purpose: quick uptime check.
+
+`POST /rewrite`
+- Purpose: rewrite a pharma email using the audience-specific prompt.
+- Example body:
+```json
+{
+  "text": "This product guarantees the best patient outcomes.",
+  "audience": "medical affairs"
+}
+```
+
+`POST /feedback`
+- Purpose: submit a rating and comments on a rewrite.
+- Example body:
+```json
+{
+  "input_text": "This product guarantees the best patient outcomes.",
+  "audience": "medical affairs",
+  "output": {"rewritten_email": "Example output..."},
+  "rating": 5,
+  "comments": "Clear and compliant."
+}
+```
+
 ---
 
 ## 🚀 Live Demo
-- API Docs: https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/docs
+- API Docs: https://pharma-email-rewrite-mofr-gph0dueeegetf9gr.westeurope-01.azurewebsites.net/docs
 
 ---
 
@@ -646,7 +907,7 @@ Deployed on Azure App Service with Docker.
 - **Backend**: FastAPI app (`src/api/main.py`)
 - **Containerization**: Docker (Python 3.10-slim base image)
 - **Hosting**: Azure App Service (Linux, B1 plan)
-- **Registry**: Docker Hub (`mofasshara/pharma-email-assistant:latest`)
+- **Registry**: Docker Hub (`mofasshara/pharma-email-assistant:rewrite`)
 
 Flow:
 1. Code → Docker build → Push to Docker Hub  
@@ -694,8 +955,14 @@ Secrets are **never hardcoded** in code — they are injected at runtime by Azur
 - Agent Orchestrator API (FastAPI + LangChain):  
   https://pharma-email-assistant-mofr-gzcfdrhwgrdqgdgd.westeurope-01.azurewebsites.net/docs
 
-- Rewrite Service API (FastAPI):  
+- Banking Risk Rewriter API (FastAPI):  
+  https://banking-risk-rewriter-mofr-bqe6akf3bwbzenfb.westeurope-01.azurewebsites.net/docs
+
+- Pharma Email Rewriter API (FastAPI):  
   https://pharma-email-rewrite-mofr-gph0dueeegetf9gr.westeurope-01.azurewebsites.net/docs
+
+- RAG Service API (FastAPI):  
+  https://rag-mofr-fhhseqb2c0etaeh9.westeurope-01.azurewebsites.net/docs
 
 ### Architecture
 Agent Orchestrator routes requests and calls downstream tool services via environment-configured URLs.
@@ -704,6 +971,7 @@ Agent Orchestrator routes requests and calls downstream tool services via enviro
 
 - Agent API (FastAPI) deployed on Azure App Service
 - Rewrite LLM service deployed as separate App Service
+- RAG service deployed as separate App Service
 - Agent orchestrates calls to rewrite service via HTTP
 - Hardened with:
   - HTTPS normalization

@@ -1,15 +1,15 @@
 import uuid
+from typing import Any
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from loguru import logger
 import traceback
 
-from domains.banking.risk_rewriter.router import router as banking_router
-from domains.banking.review_service.router import router as banking_review_router
 from src.logging_utils import log_request
 from src.safety_checks import basic_safety_check
 from src.services.rewrite_service import rewrite_email_llm
+from src.services.rag_client import fetch_rag_answer, should_use_rag
 
 
 class EmailRequest(BaseModel):
@@ -17,9 +17,18 @@ class EmailRequest(BaseModel):
     audience: str
 
 
-app = FastAPI(port=8000)
-app.include_router(banking_router)
-app.include_router(banking_review_router)
+app = FastAPI(
+    title="Pharma Email Rewriter API",
+    port=8000,
+    description=(
+        "<details><summary>Quick User Guide (click to expand)</summary>\n\n"
+        "**Purpose:** Rewrite pharma emails with compliance-aware prompts.\n\n"
+        "**How to use:**\n"
+        "1) Open `/docs` and expand `POST /rewrite`.\n"
+        "2) Paste the request body and click **Execute**.\n"
+        "</details>"
+    ),
+)
 
 
 @app.middleware("http")
@@ -45,12 +54,27 @@ class FeedbackRequest(BaseModel):
     comments: str | None = None
 
 
-@app.get("/")
+@app.get(
+    "/",
+    description="Health check for the pharma rewrite service.",
+)
 def health():
     return {"status": "ok"}
 
 
-@app.post("/rewrite")
+@app.post(
+    "/rewrite",
+    description=(
+        "Rewrite a pharma email using the audience-specific prompt.\n\n"
+        "**Example:**\n"
+        "```json\n"
+        "{\n"
+        "  \"text\": \"This product guarantees the best patient outcomes.\",\n"
+        "  \"audience\": \"medical affairs\"\n"
+        "}\n"
+        "```"
+    ),
+)
 def rewrite_email(payload: EmailRequest):
     logger.info(f"Incoming request: {payload.dict()}")
     try:
@@ -61,13 +85,30 @@ def rewrite_email(payload: EmailRequest):
                 "reason": "Potential hallucination or unsafe claim"
             }
 
-        output = rewrite_email_llm(payload.text, payload.audience)
+        rag_info = None
+        text_for_rewrite = payload.text
+        if should_use_rag(payload.text):
+            rag_info = fetch_rag_answer(payload.text)
+            if rag_info:
+                text_for_rewrite = (
+                    f"{payload.text}\n\n"
+                    "Reference context (internal documents):\n"
+                    f"{rag_info['answer']}"
+                )
+
+        output: dict[str, Any] = rewrite_email_llm(
+            text_for_rewrite,
+            payload.audience,
+        )
         if not basic_safety_check(output["rewritten_email"]):
             logger.warning("Safety check failed for rewritten email")
             return {
                 "error": "Safety check failed",
                 "reason": "Potential hallucination or unsafe claim"
             }
+        if rag_info:
+            output["rag_used"] = True
+            output["rag_sources"] = rag_info.get("sources", [])
         logger.info("Rewrite successful")
         log_request(payload.text, payload.audience, output, feedback=None)
         return output
@@ -76,7 +117,22 @@ def rewrite_email(payload: EmailRequest):
         return {"error": "internal_error"}
 
 
-@app.post("/feedback")
+@app.post(
+    "/feedback",
+    description=(
+        "Submit feedback on a rewrite to improve quality.\n\n"
+        "**Example:**\n"
+        "```json\n"
+        "{\n"
+        "  \"input_text\": \"This product guarantees the best patient outcomes.\",\n"
+        "  \"audience\": \"medical affairs\",\n"
+        "  \"output\": {\"rewritten_email\": \"Example output...\"},\n"
+        "  \"rating\": 5,\n"
+        "  \"comments\": \"Clear and compliant.\"\n"
+        "}\n"
+        "```"
+    ),
+)
 def submit_feedback(payload: FeedbackRequest):
     feedback_data = {
         "rating": payload.rating,
